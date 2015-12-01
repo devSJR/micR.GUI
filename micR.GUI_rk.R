@@ -1,6 +1,8 @@
 # RKWard plugin for the analysis of image data
 
 require(rkwarddev)
+rkwarddev.required("0.7.3")
+
 local({
   
   # Author names and contact information
@@ -11,7 +13,7 @@ local({
              email = "stefan.roediger@b-tu.de", 
              role = c("aut","cre"))),
     about = list(desc = "GUI interface to analyze image data",
-                 version = "0.0.1", url = "")
+                 version = "0.0.1", url = "https://github.com/devSJR/micR.GUI")
   )
   
   ## help page
@@ -24,7 +26,7 @@ local({
   )
   
   # Define dependencies
-  dependencies.info <- rk.XML.dependencies(dependencies = list(rkward.min = "0.6.3"), 
+  dependencies.info <- rk.XML.dependencies(dependencies = list(rkward.min = "0.6.4"), 
 					   package = list(c(name = "doParallel", min = "1.0.10"),
 							  c(name = "EBImage", min = "4.12.0"),
 							  c(name = "foreach", min = "1.4.3"),
@@ -40,13 +42,15 @@ local({
   preview.chk <- rk.XML.preview(label = "Preview")
   
   basic.settings <- rk.XML.row(
-				rk.XML.col(	dye.DAPI,
-						dye.FITC,
-						dye.Cy3,
-						dye.APC,
-     		 preview.chk,
-      rk.XML.stretch()
-    ))
+				rk.XML.col(
+				    dye.DAPI,
+				    dye.FITC,
+				    dye.Cy3,
+				    dye.APC,
+				    preview.chk,
+				    rk.XML.stretch()
+				)
+		    )
   
   
   full.dialog <- rk.XML.dialog(
@@ -57,10 +61,10 @@ local({
   )
   
   JS.calc <- rk.paste.JS(
-			  echo("img.DAPI  <- readImage(\"", dye.DAPI,"\")\n"),
-			  echo("img.FITC  <- readImage(\"", dye.FITC,"\")\n"),
-			  echo("img.Cy3  <- readImage(\"", dye.Cy3,"\")\n"),
-			  echo("img.APC  <- readImage(\"", dye.APC,"\")\n"),
+			  echo("img.DAPI  <- try(imgtoEBImage(\"", dye.DAPI,"\"))\n"),
+			  echo("img.FITC  <- try(imgtoEBImage(\"", dye.FITC,"\"))\n"),
+			  echo("img.Cy3  <- try(imgtoEBImage(\"", dye.Cy3,"\"))\n"),
+			  echo("img.APC  <- try(imgtoEBImage(\"", dye.APC,"\"))\n"),
 			  echo("img.pp   <- img.processor(img.raw = img.DAPI)\n"),
 			  echo("img.xy	 <- computeFeatures(img.pp, img.DAPI, xname = \"nucleus\")\n"),
 			  echo("img.moment <- computeFeatures.moment(img.pp)\n"),
@@ -68,7 +72,7 @@ local({
 			  echo("cl <- makeCluster(numWorkers, type = \"PSOCK\")\n"),
 			  echo("registerDoParallel(cl)\n"),
 			  echo("list.data <- list(DAPI = img.DAPI, Cy3 = img.Cy3, APC = img.APC, FITC = img.FITC)\n"),
-			  echo("res.out <- foreach(i = 1L:length(list.data), .packages = \"micR\") %dopar% spott(img.raw = list.data[[i]], img.pp = img.pp, img.moment  = img.moment, quantile = 0.03)\n")
+			  echo("res.out <- foreach(i = 1L:length(list.data), .packages = \"micR\") %dopar% if(class(list.data[[i]]) != \"try-error\") spott(img.raw = list.data[[i]], img.pp = img.pp, img.moment  = img.moment, quantile = 0.03)\n")
 			)
   
   JS.print <- rk.paste.JS(
@@ -78,7 +82,7 @@ local({
   
   )
   
-  qIAanalysis <<-  rk.plugin.skeleton(
+  imgAnalysis <<-  rk.plugin.skeleton(
     about = about.info,
     dependencies = dependencies.info,
     xml = list(dialog = full.dialog),
