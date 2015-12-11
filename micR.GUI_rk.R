@@ -74,6 +74,12 @@ local({
   thresh.offset  <- rk.XML.spinbox("Thresholding offset from the averaged value", min = , max = , initial = 0.02, max.precision = 4)
   watershed.ext  <- rk.XML.spinbox("Radius of the neighborhood in pixels", min = 0, initial = 1, max.precision = 4)
 
+  ## Image visualization
+
+  image.display <- rk.XML.checkbox("Image Display", value = "raster", un.value = "browser", chk = TRUE)
+
+
+
   ## Image processing GUI elements
 
   image.processing <- rk.XML.row(
@@ -85,43 +91,64 @@ local({
 				    watershed.ext,
 				    rk.XML.stretch()
 				)
-		    )
+			)
+
+  image.visualization <- rk.XML.row(
+				  rk.XML.col(
+				      image.display,
+				      rk.XML.stretch()
+				      )
+		      )
   
   ## Full diaglog structure
   
   full.dialog <- rk.XML.dialog(
     label = "Image Analysis",
     rk.XML.tabbook(tabs = list("Basic settings" = list(basic.settings),
-			       "Image processing" = list(image.processing)
+			       "Image processing" = list(image.processing),
+			       "Visualization" = list(image.visualization)
       )
     )
   )
   
   JS.calc <- rk.paste.JS(
 			  
-    echo("img.DAPI <- try(img.dim(\"", dye.one,"\", width = ", img.dim.width,", hight = ", img.dim.width,"))\n"),
-    echo("img.FITC <- try(img.dim(\"", dye.two,"\", width = ", img.dim.width,", hight = ", img.dim.width,"))\n"),
-    echo("img.Cy3 <- try(img.dim(\"", dye.three,"\", width = ", img.dim.width,", hight = ", img.dim.width,"))\n"),
-    echo("img.APC <- try(img.dim(\"", dye.four,"\", width = ", img.dim.width,", hight = ", img.dim.width,"))\n\n"),
+  echo("# Read images with img.dim
+	img.DAPI <- try(img.dim(\"", dye.one,"\", width = ", img.dim.width,", hight = ", img.dim.width,"))
+	img.FITC <- try(img.dim(\"", dye.two,"\", width = ", img.dim.width,", hight = ", img.dim.width,"))
+	img.Cy3 <- try(img.dim(\"", dye.three,"\", width = ", img.dim.width,", hight = ", img.dim.width,"))
+	img.APC <- try(img.dim(\"", dye.four,"\", width = ", img.dim.width,", hight = ", img.dim.width,"))
+  \n"),
     
-    echo("img.pp <- img.processor(img.raw = img.DAPI$\"img.reduced\", gblur.sigma = ", gblur.sigma,",\n"),
-    echo("\t\t\tthresh.w = ", thresh.w,", thresh.h = ", thresh.h,", thresh.offset = ", thresh.offset,",\n"),
-    echo("\t\t\twatershed.ext = ", watershed.ext,")\n\n"),
+    echo("# Create a list of the images
+	  list.data <- list(DAPI = img.DAPI, Cy3 = img.Cy3, APC = img.APC, FITC = img.FITC)\n"),
     
-    echo("img.xy <- computeFeatures(img.pp, img.DAPI$\"img.reduced\", xname = \"nucleus\")\n\n"),
-    echo("img.moment <- computeFeatures.moment(img.pp)\n\n"),
-    echo("numWorkers <- detectCores()\n"),
+    echo("# Process a subfram of the nucleus image
+	 img.pp.reduced <- img.processor(img.raw = img.DAPI[[\"img.reduced\"]], gblur.sigma = ", gblur.sigma,",
+					 thresh.w = ", thresh.w,", thresh.h = ", thresh.h,",
+					 thresh.offset = ", thresh.offset,", watershed.ext = ", watershed.ext,")
+    \n\n"),
+    
+    ite(do.full.analysis, 
+    echo("numWorkers <- detectCores();
+	  cl <- makeCluster(numWorkers, type = \"PSOCK\");
+	  registerDoParallel(cl);
+	  Img.moment.reduced <- computeFeatures.moment(img.pp.reduced);
 
-    echo("cl <- makeCluster(numWorkers, type = \"PSOCK\")\n"),
-    echo("registerDoParallel(cl)\n\n"),
-    echo("list.data <- list(DAPI = img.DAPI, Cy3 = img.Cy3, APC = img.APC, FITC = img.FITC)\n"),
-    echo("res.out <- foreach(i = 1L:length(list.data), .packages = \"micR\") %dopar% if(class(list.data[[i]]) != \"try-error\") spott(img.raw = list.data[[i]]$\"img.raw\", img.pp = img.pp, img.moment  = img.moment, quantile = 0.03)\n")
+    	  res.out <- foreach(i = 1L:length(list.data), .packages = \"micR\") %dopar% if(class(list.data[[i]]) != \"try-error\") 
+	  spott(img.raw = list.data[[i]][[\"img.raw\"]], img.pp = img.pp.reduced, img.moment  = img.moment.reduced, quantile = 0.03)\n")
+    )
   )
   
   JS.print <- rk.paste.JS(
-  echo("par(mfrow = c(1,2))\n"),
-  echo("try(display(img.DAPI$\"img.reduced\", method = \"raster\", title = \"", experiment.name,"\"))\n"),
-  echo("try(display(img.DAPI$\"img.reduced\" - img.pp, method = \"raster\"))\n")
+
+  echo("layout(matrix(c(1,2,0,3,4,5), 2, 3, byrow = FALSE))
+	try(display(img.DAPI[[\"img.reduced\"]], method = \"",  image.display,"\", title = \"", experiment.name,"\"))
+	try(display(img.DAPI[[\"img.reduced\"]] - img.pp.reduced, method = \"",  image.display,"\"))
+	try(display(rgbImage(blue = img.DAPI[[\"img.raw\"]], green = img.FITC[[\"img.raw\"]]), method = \"",  image.display,"\"))
+	try(display(rgbImage(blue = img.DAPI[[\"img.raw\"]], green = img.Cy3[[\"img.raw\"]]), method = \"",  image.display,"\"))
+	try(display(rgbImage(blue = img.DAPI[[\"img.raw\"]], red = img.APC[[\"img.raw\"]]), method = \"",  image.display,"\"))
+  \n")
   )
   
   imgAnalysis <<-  rk.plugin.skeleton(
