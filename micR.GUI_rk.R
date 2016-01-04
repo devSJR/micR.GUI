@@ -133,22 +133,32 @@ local({
     echo("numWorkers <- detectCores();
 	  cl <- makeCluster(numWorkers, type = \"PSOCK\");
 	  registerDoParallel(cl);
-	  Img.moment.reduced <- computeFeatures.moment(img.pp.reduced);
+	  img.moment.reduced <- computeFeatures.moment(img.pp.reduced);
 
     	  res.out <- foreach(i = 1L:length(list.data), .packages = \"micR\") %dopar% if(class(list.data[[i]]) != \"try-error\") 
-	  spott(img.raw = list.data[[i]][[\"img.raw\"]], img.pp = img.pp.reduced, img.moment  = img.moment.reduced, quantile = 0.03)\n")
+	  spott(img.raw = list.data[[i]][[\"img.raw\"]], img.pp = img.pp.reduced, img.moment  = img.moment.reduced, quantile = 0.03)\n
+	  names(res.out) <- names(list.data)
+	  cell.numbers <- lapply(1L:length(list.data), function(i) {length(na.omit(res.out[[i]]))})
+	  names(cell.numbers) <- names(list.data)
+	  ")
     )
   )
   
   JS.print <- rk.paste.JS(
-
+  echo("rk.sessionInfo()\n"),
   echo("layout(matrix(c(1,2,0,3,4,5), 2, 3, byrow = FALSE))
 	try(display(img.DAPI[[\"img.reduced\"]], method = \"",  image.display,"\", title = \"", experiment.name,"\"))
 	try(display(img.DAPI[[\"img.reduced\"]] - img.pp.reduced, method = \"",  image.display,"\"))
 	try(display(rgbImage(blue = img.DAPI[[\"img.raw\"]], green = img.FITC[[\"img.raw\"]]), method = \"",  image.display,"\"))
 	try(display(rgbImage(blue = img.DAPI[[\"img.raw\"]], green = img.Cy3[[\"img.raw\"]]), method = \"",  image.display,"\"))
 	try(display(rgbImage(blue = img.DAPI[[\"img.raw\"]], red = img.APC[[\"img.raw\"]]), method = \"",  image.display,"\"))
-  \n")
+  \n"),
+  ite("full", rk.paste.JS(
+      echo("rk.print.literal (\"Image Analysis:\")"),
+      echo("\n# rk.print(res.out)\n"),
+      echo("\nrk.print(cell.numbers)\n"),
+      level = 3)
+    )
   )
   
   imgAnalysis <<-  rk.plugin.skeleton(
