@@ -73,6 +73,9 @@ local({
   thresh.h  <- rk.XML.spinbox("Hight of the moving rectangular window", min = 0, initial = 20, max.precision = 2)
   thresh.offset  <- rk.XML.spinbox("Thresholding offset from the averaged value", min = , max = , initial = 0.02, max.precision = 4)
   watershed.ext  <- rk.XML.spinbox("Radius of the neighborhood in pixels", min = 0, initial = 1, max.precision = 4)
+  
+  ## spott function
+  spott.quantile <- rk.XML.spinbox("quantile", min = 0.001, max = 0.999, initial = 0.03, max.precision = 3)
 
   ## Image visualization
 
@@ -89,6 +92,7 @@ local({
 				    thresh.h,
 				    thresh.offset,
 				    watershed.ext,
+				    spott.quantile,
 				    rk.XML.stretch()
 				)
 			)
@@ -114,10 +118,10 @@ local({
   JS.calc <- rk.paste.JS(
 			  
   echo("# Read images with img.dim
-	img.DAPI <- try(img.dim(\"", dye.one,"\", width = ", img.dim.width,", hight = ", img.dim.width,"))
-	img.FITC <- try(img.dim(\"", dye.two,"\", width = ", img.dim.width,", hight = ", img.dim.width,"))
-	img.Cy3 <- try(img.dim(\"", dye.three,"\", width = ", img.dim.width,", hight = ", img.dim.width,"))
-	img.APC <- try(img.dim(\"", dye.four,"\", width = ", img.dim.width,", hight = ", img.dim.width,"))
+	img.DAPI <- try(img.dim(\"", dye.one,"\", width = ", img.dim.width,", hight = ", img.dim.width,"), silent = TRUE)
+	img.FITC <- try(img.dim(\"", dye.two,"\", width = ", img.dim.width,", hight = ", img.dim.width,"), silent = TRUE)
+	img.Cy3 <- try(img.dim(\"", dye.three,"\", width = ", img.dim.width,", hight = ", img.dim.width,"), silent = TRUE)
+	img.APC <- try(img.dim(\"", dye.four,"\", width = ", img.dim.width,", hight = ", img.dim.width,"), silent = TRUE)
   \n"),
     
     echo("# Create a list of the images
@@ -130,17 +134,18 @@ local({
     \n\n"),
     
     ite(do.full.analysis, 
-    echo("numWorkers <- detectCores();
-	  cl <- makeCluster(numWorkers, type = \"PSOCK\");
-	  registerDoParallel(cl);
-	  img.moment.reduced <- computeFeatures.moment(img.pp.reduced);
+      echo("# Do full analysis of images by parallel processing
+	    numWorkers <- detectCores();
+	    cl <- makeCluster(numWorkers, type = \"PSOCK\");
+	    registerDoParallel(cl);
+	    img.moment.reduced <- computeFeatures.moment(img.pp.reduced);
 
-    	  res.out <- foreach(i = 1L:length(list.data), .packages = \"micR\") %dopar% if(class(list.data[[i]]) != \"try-error\") 
-	  spott(img.raw = list.data[[i]][[\"img.raw\"]], img.pp = img.pp.reduced, img.moment  = img.moment.reduced, quantile = 0.03)\n
-	  names(res.out) <- names(list.data)
-	  cell.numbers <- lapply(1L:length(list.data), function(i) {length(na.omit(res.out[[i]]))})
-	  names(cell.numbers) <- names(list.data)
-	  ")
+	    res.out <- foreach(i = 1L:length(list.data), .packages = \"micR\") %dopar% if(class(list.data[[i]]) != \"try-error\") 
+	    spott(img.raw = list.data[[i]][[\"img.raw\"]], img.pp = img.pp.reduced, img.moment  = img.moment.reduced, quantile = ", spott.quantile,")\n
+	    names(res.out) <- names(list.data)
+	    cell.numbers <- lapply(1L:length(list.data), function(i) {length(na.omit(res.out[[i]]))})
+	    names(cell.numbers) <- names(list.data)
+	    ")
     )
   )
   
