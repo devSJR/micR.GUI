@@ -1,5 +1,6 @@
 # RKWard plugin for the analysis of image data
-
+# Convention: The naming convention is to use period.separated
+# (Baåth, R. (2012), The R Journal 4(2)) if possible.
 require(rkwarddev)
 rkwarddev.required("0.7.3")
 
@@ -26,7 +27,7 @@ local({
   )
   
   # Define dependencies
-  dependencies.info <- rk.XML.dependencies(dependencies = list(rkward.min = "0.6.4", R.min = "3.2"), 
+  dependencies.info <- rk.XML.dependencies(dependencies = list(rkward.min = "0.6.3", R.min = "3.2"), 
 					   package = list(c(name = "doParallel", min = "1.0.10"),
 							  c(name = "EBImage", min = "4.12.0"),
 							  c(name = "foreach", min = "1.4.3"),
@@ -40,11 +41,19 @@ local({
   # Do full analysis
   do.full.analysis <- rk.XML.checkbox("Start full analysis")
   
+  # Definition for warning settings
+  # Default is to show no warnings
+  warn.chk  <- rk.XML.cbox("Show warnings", value = "0", un.value = "-1")
+  
   # File browser for XLS data.
-  dye.one <- rk.XML.browser("DAPI:", url = TRUE, required = TRUE, filter = c("*.bmp", "*.png"))
-  dye.two <- rk.XML.browser("FITC:", url = TRUE, required = FALSE, filter = c("*.bmp", "*.png"))
-  dye.three <- rk.XML.browser("Cy3:", url = TRUE, required = FALSE, filter = c("*.bmp", "*.png"))
-  dye.four <- rk.XML.browser("APC:", url = TRUE, required = FALSE, filter = c("*.bmp", "*.png"))
+  # Convntion: The names of the dyes will not be used for the initial variale 
+  # assignment. Instead, by convention all dyes will have a name consisting of the
+  # expression dye, followed by a running number (e.g., dye.one).
+  
+  dye.one <- rk.XML.browser("DAPI:", url = TRUE, required = TRUE, filter = c("*.bmp", "*.png", "*.tiff", "*.tif"))
+  dye.two <- rk.XML.browser("FITC:", url = TRUE, required = FALSE, filter = c("*.bmp", "*.png", "*.tiff", "*.tif"))
+  dye.three <- rk.XML.browser("Cy3:", url = TRUE, required = FALSE, filter = c("*.bmp", "*.png", "*.tiff", "*.tif"))
+  dye.four <- rk.XML.browser("APC:", url = TRUE, required = FALSE, filter = c("*.bmp", "*.png", "*.tiff", "*.tif"))
 
   img.dim.width <- rk.XML.spinbox("Preview width", min = 0, max = 100, initial = 25, real = FALSE)
   
@@ -60,11 +69,14 @@ local({
 				    dye.three,
 				    dye.four,
 				    img.dim.width,
-				    preview.chk,
-				    do.full.analysis,
+				    rk.XML.row(
+				      preview.chk,
+				      do.full.analysis),
 				    rk.XML.stretch()
 				)
 		    )
+		    
+  advanced.settings <- rk.XML.row(warn.chk)
 
   ## Image processing (img.processor)
 
@@ -110,13 +122,13 @@ local({
     label = "Image Analysis",
     rk.XML.tabbook(tabs = list("Basic settings" = list(basic.settings),
 			       "Image processing" = list(image.processing),
-			       "Visualization" = list(image.visualization)
+			       "Visualization" = list(image.visualization),
+			       "Advanced settings" = list(advanced.settings)
       )
     )
   )
   
   JS.calc <- rk.paste.JS(
-			  
   echo("# Read images with img.dim
 	img.DAPI <- try(img.dim(\"", dye.one,"\", width = ", img.dim.width,", hight = ", img.dim.width,"), silent = TRUE)
 	img.FITC <- try(img.dim(\"", dye.two,"\", width = ", img.dim.width,", hight = ", img.dim.width,"), silent = TRUE)
@@ -131,23 +143,32 @@ local({
 	 img.pp.reduced <- img.processor(img.raw = img.DAPI[[\"img.reduced\"]], gblur.sigma = ", gblur.sigma,",
 					 thresh.w = ", thresh.w,", thresh.h = ", thresh.h,",
 					 thresh.offset = ", thresh.offset,", watershed.ext = ", watershed.ext,")
-    \n\n"),
-    
-    ite(do.full.analysis, 
+    \n"),
+    js(
+    if(!do.full.analysis) { 
       echo("# Do full analysis of images by parallel processing
+	    options(warn = ", warn.chk,");
 	    numWorkers <- detectCores();
 	    cl <- makeCluster(numWorkers, type = \"PSOCK\");
 	    registerDoParallel(cl);
-	    img.moment.reduced <- computeFeatures.moment(img.pp.reduced);
+	    
+	   # Process a subfram of the nucleus image
+	    img.pp <- img.processor(img.raw = img.DAPI[[\"img.raw\"]], gblur.sigma = ", gblur.sigma,",
+				    thresh.w = ", thresh.w,", thresh.h = ", thresh.h,",
+				    thresh.offset = ", thresh.offset,", watershed.ext = ", watershed.ext,");
+				    
+	    img.moment <- computeFeatures.moment(img.pp);
 
 	    res.out <- foreach(i = 1L:length(list.data), .packages = \"micR\") %dopar% if(class(list.data[[i]]) != \"try-error\") 
-	    spott(img.raw = list.data[[i]][[\"img.raw\"]], img.pp = img.pp.reduced, img.moment  = img.moment.reduced, quantile = ", spott.quantile,")\n
+	    spott(img.raw = list.data[[i]][[\"img.raw\"]], img.pp = img.pp, img.moment  = img.moment, quantile = ", spott.quantile,")\n
 	    names(res.out) <- names(list.data)
 	    cell.numbers <- lapply(1L:length(list.data), function(i) {length(na.omit(res.out[[i]]))})
 	    names(cell.numbers) <- names(list.data)
 	    ")
+	  }
+      )
     )
-  )
+
   
   JS.print <- rk.paste.JS(
   echo("rk.sessionInfo()\n"),
