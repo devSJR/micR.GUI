@@ -145,7 +145,7 @@ local({
 					 thresh.offset = ", thresh.offset,", watershed.ext = ", watershed.ext,")
     \n"),
     js(
-    if(!do.full.analysis) { 
+    if(do.full.analysis) { 
       echo("# Do full analysis of images by parallel processing
 	    options(warn = ", warn.chk,");
 	    numWorkers <- detectCores();
