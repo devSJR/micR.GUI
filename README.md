@@ -11,8 +11,15 @@ You can install the latest development version of the code using the `devtools` 
 
 ```R
 # Install devtools, if you haven't already.
+
+## try http:// if https:// URLs are not supported
+source("https://bioconductor.org/biocLite.R")
+biocLite("EBImage")
+
+# Install the devtools package
 install.packages("devtools")
 library(devtools)
 
+# Install the micR from github
 install_github("devSJR/micR")
 
