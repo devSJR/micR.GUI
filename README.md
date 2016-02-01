@@ -1,6 +1,3 @@
-# micR.GUI
-micR.GUI
-
 ====
 micR.GUI is a script to build a graphical user interface for RKWard
 Process image data for the enumeration of fluorescent image cells
